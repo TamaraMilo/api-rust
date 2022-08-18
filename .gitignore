@@ -3,6 +3,7 @@ debug/
 target/
 Cargo.lock
 
+.env
 **/*.rs.bk
 
 *.pdb
