@@ -23,23 +23,23 @@ pub struct ChangedData{
 
 
 impl FileInfo {
-    pub fn new(file: &mut OtherFile) -> std::io::Result<Self> {
+    pub fn new(file: &mut OtherFile,path: String) -> std::io::Result<Self> {
         
         let id = Uuid::new_v4();
         let extension = file.get_extension().unwrap().to_string();
 
-        let path = format!("{}{}.{}", dotenv::var("BASIC_STORAGE").unwrap(), id, extension);
+        let new_path = format!("{}{}.{}", path, id, extension);
         
         let mut buf = Vec::new();
         file.file.read_to_end(&mut buf)?;
-        let mut new_file = File::create(&path)?;
+        let mut new_file = File::create(&new_path)?;
         new_file.write_all(&buf)?;
         
 
         Ok(Self{
             id,
             buf,
-            path,
+            path:new_path,
             extension
         })
     }

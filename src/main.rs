@@ -2,6 +2,7 @@
 use actix_web::{delete, post, put, get, web, App, HttpResponse, HttpServer};
 mod errors;
 mod file;
+mod bucket;
 use file::FileInfo;
 use sea_orm::{DatabaseConnection, ActiveModelTrait, Set, EntityTrait};
 use migration::{Migrator, MigratorTrait};
@@ -13,6 +14,7 @@ use actix_easy_multipart::{FromMultipart,File};
 use actix_easy_multipart::extractor::{MultipartForm,MultipartFormConfig};
 use serde::Serialize;
 use dotenv::dotenv;
+use bucket::Bucket;
 
 
 
@@ -59,8 +61,7 @@ async fn save_file(data: web::Data<AppState>,mut payload: MultipartForm<Upload>)
 
     let conn = &data.conn;
     
- 
-    let file_info = match FileInfo::new(&mut payload.image) {
+    let file_info = match FileInfo::new(&mut payload.image,dotenv::var("BASIC_STORAGE").unwrap()) {
         Ok(r) => r,
         Err(_) => return HttpResponse::BadRequest().json(Response{
                 data: None,
@@ -87,7 +88,34 @@ async fn save_file(data: web::Data<AppState>,mut payload: MultipartForm<Upload>)
     
 }
 
-
+#[post("/files/bucket/{bucketId}")]
+async fn save_file_in_bucket(data: web::Data<AppState>,bucketId: web::Path<String>, mut payload: MultipartForm<Upload>) -> HttpResponse {
+    let conn = &data.conn;
+    let path = format!("{}{}/",dotenv::var("BASIC_STORAGE").unwrap(), bucketId.to_string());
+    let file_info = match FileInfo::new(&mut payload.image,path) {
+        Ok(r)=>r,
+        Err(_)=> return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors: Some(CustomError::BucketNotExisting.error_response())
+        })
+        
+    };
+    let file = ActiveModel {
+        id: Set(file_info.id.to_string()),
+        extension: Set(file_info.extension.to_string()),
+        path: Set(file_info.path.to_string())
+    };
+    let _file: Model = file.insert(conn).await.expect(&CustomError::WritingFileError.error_response());
+    HttpResponse::Ok().json(
+        Response{ 
+            data: Some( Model {
+                id: file_info.id.to_string(),
+                extension: file_info.extension,
+                path: file_info.path,
+            }),
+            errors: None
+        })
+}
 
 #[put("/files/{id}")]
 async fn change_file(data: web::Data<AppState>,id: web::Path<String>,mut payload: MultipartForm<Upload>) -> HttpResponse {
@@ -158,6 +186,19 @@ async fn delete_file(data: web::Data<AppState>,id: web::Path<String>) -> HttpRes
     };
     
 }
+#[post("/bucket")]
+async fn new_bucket() -> HttpResponse {
+    match Bucket::new() {
+        Ok(r) => return HttpResponse::Ok().json(Response{
+            data: Some(r),
+            errors: None,
+        }),
+        Err(e)=> return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors: Some(CustomError::BucketCreateError.error_response()),
+        })
+    }
+}
 
 #[actix_web::main]
 
@@ -181,7 +222,10 @@ async fn main() -> std::io::Result<()> {
             .service(delete_file)
             .service(save_file)
             .service(get_file)
+            .service(new_bucket)
+            .service(save_file_in_bucket)
             .wrap(Logger::default())
+
     })
     .bind(("127.0.0.1", 8080))?
     .run()

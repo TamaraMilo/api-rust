@@ -11,7 +11,11 @@ pub enum CustomError {
     ChangeFileError,
     #[error("Error fetching data from database. File do not exist.")]
     NoFileError,
-}
+    #[error("Error accrued while creating a bucket.")]
+    BucketCreateError,
+    #[error("Error creating file. Specified bucket does not exist")]
+    BucketNotExisting,
+}   
 impl CustomError {
     pub fn error_response(&self) -> String {
         self.to_string()
