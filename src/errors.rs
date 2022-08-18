@@ -1,3 +1,4 @@
+
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
 
@@ -17,6 +18,8 @@ pub enum CustomError {
     BucketNotExisting,
     #[error("Error accrues while deleting bucket.")]
     BucketDeleteError,
+    #[error("Error loading env data")]
+    EnvError,
 }   
 impl CustomError {
     pub fn error_response(&self) -> String {

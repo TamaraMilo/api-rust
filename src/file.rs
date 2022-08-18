@@ -5,6 +5,8 @@ use std::io::prelude::*;
 use uuid::Uuid;
 use actix_easy_multipart::File as OtherFile;
 
+
+
 pub struct FileInfo {
     pub id: Uuid,
     pub buf: Vec<u8>,
@@ -23,17 +25,11 @@ pub struct ChangedData{
 
 
 impl FileInfo {
-    pub fn new(file: &mut OtherFile,bucket_id: String) -> std::io::Result<Self> {
+    pub fn new(file: &mut OtherFile,bucket_id: String,storage: String ) -> std::io::Result<Self> {
         
         let id = Uuid::new_v4();
         let extension = file.get_extension().unwrap().to_string();
-        let mut path = String::new();
-        if bucket_id.eq("") {
-            path = format!("{}{}.{}",dotenv::var("BASIC_STORAGE").unwrap(), id, extension);
-        } else {
-            path = format!("{}{}/{}.{}",dotenv::var("BASIC_STORAGE").unwrap(),bucket_id, id, extension);
-        }
-       
+        let path = format!("{}{}/{}.{}",storage,bucket_id, id, extension);   
         
         let mut buf = Vec::new();
         file.file.read_to_end(&mut buf)?;
