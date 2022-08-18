@@ -61,7 +61,7 @@ async fn save_file(data: web::Data<AppState>,mut payload: MultipartForm<Upload>)
 
     let conn = &data.conn;
     
-    let file_info = match FileInfo::new(&mut payload.image,dotenv::var("BASIC_STORAGE").unwrap()) {
+    let file_info = match FileInfo::new(&mut payload.image,"".to_string()) {
         Ok(r) => r,
         Err(_) => return HttpResponse::BadRequest().json(Response{
                 data: None,
@@ -88,17 +88,16 @@ async fn save_file(data: web::Data<AppState>,mut payload: MultipartForm<Upload>)
     
 }
 
-#[post("/files/bucket/{bucketId}")]
-async fn save_file_in_bucket(data: web::Data<AppState>,bucketId: web::Path<String>, mut payload: MultipartForm<Upload>) -> HttpResponse {
+#[post("/files/{bucketId}")]
+async fn save_file_in_bucket(data: web::Data<AppState>,bucket_id: web::Path<String>, mut payload: MultipartForm<Upload>) -> HttpResponse {
     let conn = &data.conn;
-    let path = format!("{}{}/",dotenv::var("BASIC_STORAGE").unwrap(), bucketId.to_string());
-    let file_info = match FileInfo::new(&mut payload.image,path) {
+    
+    let file_info = match FileInfo::new(&mut payload.image,bucket_id.to_string()) {
         Ok(r)=>r,
         Err(_)=> return HttpResponse::BadRequest().json(Response{
             data: None,
             errors: Some(CustomError::BucketNotExisting.error_response())
         })
-        
     };
     let file = ActiveModel {
         id: Set(file_info.id.to_string()),
@@ -178,7 +177,10 @@ async fn delete_file(data: web::Data<AppState>,id: web::Path<String>) -> HttpRes
         }),
     };
     match Info::delete_by_id(id.to_string()).exec(conn).await {
-        Ok(_) =>return  HttpResponse::Ok().json(""),
+        Ok(_) =>return  HttpResponse::Ok().json(Response{
+            data: Some(()),
+            errors: None,
+        }),
         Err(_)=> return HttpResponse::BadRequest().json(Response{
             data:None,
             errors: Some(CustomError::DeletingFileError.error_response()),
@@ -193,9 +195,22 @@ async fn new_bucket() -> HttpResponse {
             data: Some(r),
             errors: None,
         }),
-        Err(e)=> return HttpResponse::BadRequest().json(Response{
+        Err(_)=> return HttpResponse::BadRequest().json(Response{
             data: None,
             errors: Some(CustomError::BucketCreateError.error_response()),
+        })
+    }
+}
+#[delete("/bucket/{bucket_id}")]
+async fn delete_bucket(bucket_id: web::Path<String>) -> HttpResponse {
+    match Bucket::delete(bucket_id.to_string()) {
+        Ok(())=> return HttpResponse::Ok().json(Response{
+            data: Some(()),
+            errors: None,
+        }),
+        Err(_)=> return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors:Some(CustomError::BucketDeleteError.error_response()),
         })
     }
 }
@@ -224,6 +239,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_file)
             .service(new_bucket)
             .service(save_file_in_bucket)
+            .service(delete_bucket)
             .wrap(Logger::default())
 
     })

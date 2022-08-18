@@ -15,6 +15,8 @@ pub enum CustomError {
     BucketCreateError,
     #[error("Error creating file. Specified bucket does not exist")]
     BucketNotExisting,
+    #[error("Error accrues while deleting bucket.")]
+    BucketDeleteError,
 }   
 impl CustomError {
     pub fn error_response(&self) -> String {

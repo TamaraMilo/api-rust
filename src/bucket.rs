@@ -5,7 +5,6 @@ use uuid::Uuid;
 #[derive(Serialize)]
 pub struct Bucket {
     pub id: Uuid,
-    pub path: String,
 }
 
 impl Bucket {
@@ -15,11 +14,11 @@ impl Bucket {
         fs::create_dir(&path)?;
         Ok(Self{
             id,
-            path,
+          
         })
     }
-    pub fn delete(path: String) -> Result<(),std::io::Error>
-    {
+    pub fn delete(bucket_id: String) -> Result<(),std::io::Error>
+    {   let path = format!("{}{}",dotenv::var("BASIC_STORAGE").unwrap(),bucket_id);
         fs::remove_dir(path)?;
         Ok(())
     }
