@@ -18,8 +18,10 @@ pub enum CustomError {
     BucketNotExisting,
     #[error("Error accrues while deleting bucket.")]
     BucketDeleteError,
-    #[error("Error loading env data")]
-    EnvError,
+    #[error("Error loading data from database.")]
+    DatabaseError,
+    #[error("Error accrued while savinga data in database.")]
+    SavigError,
 }   
 impl CustomError {
     pub fn error_response(&self) -> String {

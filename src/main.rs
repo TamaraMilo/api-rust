@@ -18,16 +18,31 @@ use bucket::Bucket;
 
 
 
+
 #[derive(Debug,Clone)]
-struct AppState {
+struct AppState{
     conn: DatabaseConnection,
-    app_data: AppData,
+    env_data: EnvData,
 }
 
 #[derive(Debug,Clone)]
-pub struct AppData {
-    database_url:Option<String>,
-    basic_storage: Option<String>,
+pub struct EnvData{
+    database_url:  String,
+    basic_storage: String,
+    max_transfe_size: usize,
+}
+
+impl EnvData {
+    pub fn load()-> std::io::Result<Self> {   
+        let database_url = dotenv::var("DATABASE_URL").unwrap();
+        let basic_storage = dotenv::var("BASIC_STORAGE").unwrap();
+        let max_transfe_size = dotenv::var("MAX_TRANSFER_SIZE").unwrap().parse::<i32>().unwrap().try_into().unwrap(); 
+        Ok(Self{
+            database_url,
+            basic_storage,
+            max_transfe_size,
+        })
+    }
 }
 #[derive(FromMultipart,Debug)]
 struct Upload {
@@ -49,69 +64,26 @@ struct FileDetails {
 #[get("/files/{id}")]
 async fn get_file(data: web::Data<AppState>,id: web::Path<String>) -> HttpResponse{
 
-    if data.app_data.basic_storage ==None {
-        return HttpResponse::BadRequest().json(Response{
-            data:None,
-            errors: Some(CustomError::EnvError.error_response())  
-        })
-    }
+
     let conn = &data.conn;
-    let _file =match Info::find_by_id(id.to_string()).one(conn).await.unwrap() {
-        Some(r)=> return  HttpResponse::Ok().json(Response{
-            data: Some(r),
+    match Info::find_by_id(id.to_string()).one(conn).await {
+        Ok(r)=> return  HttpResponse::Ok().json(Response{
+            data: r,
             errors: None,
         }),
-        None => return HttpResponse::BadRequest().json(Response{
+        Err(_) => return HttpResponse::BadRequest().json(Response{
             data: None,
             errors: Some(CustomError::NoFileError.error_response()),
         })
     };
    
 }
-
-// #[post("/files")]
-// async fn save_file(data: web::Data<AppState>,mut payload: MultipartForm<Upload>) -> HttpResponse {
-
-//     let conn = &data.conn;
-    
-//     let file_info = match FileInfo::new(&mut payload.image,"".to_string()) {
-//         Ok(r) => r,
-//         Err(_) => return HttpResponse::BadRequest().json(Response{
-//                 data: None,
-//                 errors: Some(CustomError::WritingFileError.error_response())     
-//             })
-//     };
-//     let file = ActiveModel {
-//         id: Set(file_info.id.to_string()),
-//         extension: Set(file_info.extension.to_string()),
-//         path: Set(file_info.path.to_string())
-//     };
-
-
-//     let _file: Model = file.insert(conn).await.expect(&CustomError::WritingFileError.error_response());
-//     HttpResponse::Ok().json(
-//         Response{ 
-//             data: Some( Model {
-//                 id: file_info.id.to_string(),
-//                 extension: file_info.extension,
-//                 path: file_info.path,
-//             }),
-//             errors: None
-//         })
-    
-// }
-
 #[post("/files/{bucketId}")]
 async fn save_file_in_bucket(data: web::Data<AppState>,bucket_id: web::Path<String>, mut payload: MultipartForm<Upload>) -> HttpResponse {
-    if data.app_data.basic_storage ==None {
-        return HttpResponse::BadRequest().json(Response{
-            data:None,
-            errors: Some(CustomError::EnvError.error_response())  
-        })
-    }
+   
     let conn = &data.conn;
     
-    let file_info = match FileInfo::new(&mut payload.image,bucket_id.to_string(),data.app_data.basic_storage.clone().unwrap()) {
+    let file_info = match FileInfo::new(&mut payload.image,bucket_id.to_string(),&data.env_data.basic_storage) {
         Ok(r)=>r,
         Err(_)=> return HttpResponse::BadRequest().json(Response{
             data: None,
@@ -123,29 +95,35 @@ async fn save_file_in_bucket(data: web::Data<AppState>,bucket_id: web::Path<Stri
         extension: Set(file_info.extension.to_string()),
         path: Set(file_info.path.to_string())
     };
-    let _file: Model = file.insert(conn).await.expect(&CustomError::WritingFileError.error_response());
-    HttpResponse::Ok().json(
-        Response{ 
-            data: Some( Model {
-                id: file_info.id.to_string(),
-                extension: file_info.extension,
-                path: file_info.path,
+    match file.insert(conn).await {
+        Ok(_)=>return  HttpResponse::Ok().json(
+            Response{ 
+                data: Some( Model {
+                    id: file_info.id.to_string(),
+                    extension: file_info.extension,
+                    path: file_info.path,
+                }),
+                errors: None
             }),
-            errors: None
+        Err(_)=> return HttpResponse::BadRequest().json(Response{
+            data:None,
+            errors: Some(CustomError::SavigError.error_response())
         })
+    };
+   
 }
-
 #[put("/files/{id}")]
 async fn change_file(data: web::Data<AppState>,id: web::Path<String>,mut payload: MultipartForm<Upload>) -> HttpResponse {
-    if data.app_data.basic_storage ==None {
-        return HttpResponse::BadRequest().json(Response{
-            data:None,
-            errors: Some(CustomError::EnvError.error_response())  
-        })
-    }
+    
     let conn = &data.conn;
 
-    let file = Info::find_by_id(id.to_string()).one(conn).await.unwrap();
+    let file = match Info::find_by_id(id.to_string()).one(conn).await{
+        Ok(r)=>r,
+        Err(_)=>return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors: Some(CustomError::DatabaseError.error_response())
+        })
+    };
     
     if file == None {
         return HttpResponse::BadRequest().json(Response {
@@ -154,7 +132,7 @@ async fn change_file(data: web::Data<AppState>,id: web::Path<String>,mut payload
         })
     }
     
-    let new_file_info =match FileInfo::change_data(file::ChangeArgs{data:  &mut payload.image, path: file.as_ref().unwrap().path.clone()}) {
+    let new_file_info =match FileInfo::change_data(file::ChangeArgs{data:  &mut payload.image,file_info: file.as_ref().unwrap()}) {
         Ok(r)=>r,
         Err(_) => return HttpResponse::BadRequest().json(Response {
             data: None,
@@ -165,29 +143,27 @@ async fn change_file(data: web::Data<AppState>,id: web::Path<String>,mut payload
     let mut file: entity::info::ActiveModel = file.unwrap().into();
     file.path = Set(new_file_info.path.clone());
     file.extension = Set(new_file_info.extension.to_string());
-    file.update(conn).await.unwrap();
-
-    HttpResponse::Ok().json(Response {
-        data: Some( Model {
-            id: id.to_string(),
-            path: new_file_info.path,
-            extension: new_file_info.extension .to_string(),
+    match file.update(conn).await{
+        Ok(_)=> return HttpResponse::Ok().json(Response {
+            data: Some( Model {
+                id: id.to_string(),
+                path: new_file_info.path,
+                extension: new_file_info.extension .to_string(),
+            }),
+            errors: None,
         }),
-        errors: None,
-    }) 
+        Err(_) => return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors:  Some(CustomError::SavigError.error_response())
+        })
+    };
+
+    
     
 }
-
-
-
 #[delete("/files/{id}")]
 async fn delete_file(data: web::Data<AppState>,id: web::Path<String>) -> HttpResponse {
-    if data.app_data.basic_storage ==None {
-        return HttpResponse::BadRequest().json(Response{
-            data:None,
-            errors: Some(CustomError::EnvError.error_response())  
-        })
-    }
+   
     let conn = &data.conn;
 
     let file = Info::find_by_id(id.to_string()).one(conn).await.unwrap();
@@ -219,13 +195,8 @@ async fn delete_file(data: web::Data<AppState>,id: web::Path<String>) -> HttpRes
 }
 #[post("/bucket")]
 async fn new_bucket(data: web::Data<AppState>) -> HttpResponse {
-    if data.app_data.basic_storage ==None {
-        return HttpResponse::BadRequest().json(Response{
-            data:None,
-            errors: Some(CustomError::EnvError.error_response())  
-        })
-    }
-    match Bucket::new() {
+    
+    match Bucket::new(&data.env_data.basic_storage) {
         Ok(r) => return HttpResponse::Ok().json(Response{
             data: Some(r),
             errors: None,
@@ -237,14 +208,9 @@ async fn new_bucket(data: web::Data<AppState>) -> HttpResponse {
     }
 }
 #[delete("/bucket/{bucket_id}")]
-async fn delete_bucket(data: web::Data<AppState>,bucket_id: web::Path<String>) -> HttpResponse {
-    if data.app_data.basic_storage ==None {
-        return HttpResponse::BadRequest().json(Response{
-            data:None,
-            errors: Some(CustomError::EnvError.error_response())  
-        })
-    }
-    match Bucket::delete(bucket_id.to_string()) {
+async fn delete_bucket(bucket_id: web::Path<String>,data: web::Data<AppState>) -> HttpResponse {
+    
+    match Bucket::delete(bucket_id.to_string(),&data.env_data.basic_storage) {
         Ok(())=> return HttpResponse::Ok().json(Response{
             data: Some(()),
             errors: None,
@@ -260,36 +226,23 @@ async fn delete_bucket(data: web::Data<AppState>,bucket_id: web::Path<String>) -
 async fn main() -> std::io::Result<()> {
 
     dotenv().ok();
-    let env_data = AppData {
-        database_url:match dotenv::var("DATABASE_URL") {
-                Ok(r)=>Some(r),
-                Err(_)=> None,
-            },
-        basic_storage: match  dotenv::var("BASIC_STORAGE") {
-                Ok(r)=>Some(r),
-                Err(_)=> None,
-            }
-    };
+    
+    let env_data = EnvData::load().unwrap();
 
-
-    let conn : DatabaseConnection = sea_orm::Database::connect( env_data.database_url.clone().unwrap()).await.expect("Error in conenction");
+    let conn : DatabaseConnection = sea_orm::Database::connect( &env_data.database_url).await.expect("Error in conenction");
     
     
-    match Migrator::up(&conn,None).await { 
-        Ok(_) => println!("Migracije su okej"),
-        Err(_) => println!("Migracije nisu okej")
-    };
+    Migrator::up(&conn,None).await.expect("Error performing migrations");
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(AppState{
+            .app_data(web::Data::new(AppState{ 
                 conn:conn.clone(),
-                app_data: env_data.clone(),
+                env_data: env_data.clone(),
             }))
-            .app_data(MultipartFormConfig::default().file_limit(25 * 1024 * 1024))
+            .app_data(MultipartFormConfig::default().file_limit(env_data.max_transfe_size))
             .service(change_file)
             .service(delete_file)
-            // .service(save_file)
             .service(get_file)
             .service(new_bucket)
             .service(save_file_in_bucket)
