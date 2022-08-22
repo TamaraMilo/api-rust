@@ -1,46 +1,65 @@
 
+use actix_web::cookie::Cookie;
+use actix_web::web::Data;
 use actix_web::{delete, post, put, get, web, App, HttpResponse, HttpServer};
 mod errors;
 mod file;
+mod auth;
 mod bucket;
+mod responses;
+use auth::{UserClaims,Role};
 use file::FileInfo;
-use sea_orm::{DatabaseConnection, ActiveModelTrait, Set, EntityTrait};
+use sea_orm::{DatabaseConnection, ActiveModelTrait, Set, EntityTrait, QueryFilter, ColumnTrait};
 use migration::{Migrator, MigratorTrait};
 use actix_web::middleware::Logger;
 use entity::info::{ ActiveModel, Model};
 use entity::info::Entity as Info;
+use entity::user::ActiveModel as ActiveModelUser;
+use entity::user::Model as UserModel;
+use entity::user::Entity as User;
 use errors::CustomError;
 use actix_easy_multipart::{FromMultipart,File};
 use actix_easy_multipart::extractor::{MultipartForm,MultipartFormConfig};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use dotenv::dotenv;
 use bucket::Bucket;
+use actix_jwt_auth_middleware::{Authority, AuthService};
+use pwhash::bcrypt;
+
+use crate::responses::ResponseText;
 
 
-
-
-#[derive(Debug,Clone)]
+#[derive(Clone)]
 struct AppState{
     conn: DatabaseConnection,
     env_data: EnvData,
+    cookie: Option<Cookie<'static>>,
+    auth: Authority<UserClaims>,
 }
+#[derive(Serialize, Deserialize)]
+struct UserData {
+    username: String,
+    password: String,
+}
+
 
 #[derive(Debug,Clone)]
 pub struct EnvData{
     database_url:  String,
     basic_storage: String,
-    max_transfe_size: usize,
+    max_transfer_size: usize,
+  
 }
 
 impl EnvData {
     pub fn load()-> std::io::Result<Self> {   
         let database_url = dotenv::var("DATABASE_URL").unwrap();
         let basic_storage = dotenv::var("BASIC_STORAGE").unwrap();
-        let max_transfe_size = dotenv::var("MAX_TRANSFER_SIZE").unwrap().parse::<i32>().unwrap().try_into().unwrap(); 
+        let max_transfer_size = dotenv::var("MAX_TRANSFER_SIZE").unwrap().parse::<i32>().unwrap().try_into().unwrap(); 
         Ok(Self{
             database_url,
             basic_storage,
-            max_transfe_size,
+            max_transfer_size,
         })
     }
 }
@@ -60,6 +79,114 @@ struct FileDetails {
     extension:String,
     path:String,
 }
+async fn verify_service_request(user_claims: UserClaims) ->bool{
+    match user_claims.role {
+        Role::Admin => true,
+        Role::BaseUser=>false
+    }
+}
+
+
+#[get("/login")]
+async fn login( data: web::Data<AppState>, user: web::Json<UserData>) -> HttpResponse {
+
+    let conn=&data.conn;
+
+    let user_db = match  User::find()
+     .filter(entity::user::Column::Username.contains(&user.username.to_string())).one(conn).await 
+    {
+        Ok(r)=>r,
+        Err(_) => return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors: Some(CustomError::DatabaseError.error_response())
+        })
+    };
+
+    let user_db = match user_db {
+        Some(r)=> r,
+        None=> return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors: Some(CustomError::NoUser.error_response())
+        })
+    };
+
+    let hash_password =  match bcrypt::hash(user.password.to_string()){
+        Ok(r)=>r,
+        Err(_)=> return HttpResponse::BadRequest().json(Response{
+            data:None,
+            errors: Some(CustomError::SavigError.error_response()),
+        })
+    };
+
+    if hash_password != user_db.password {
+        return HttpResponse::BadRequest().json(Response{
+            data:None,
+            errors: Some(CustomError::IncorrectPassword.error_response())
+        })
+    }
+
+
+    let mut cookie =  match data.auth.create_signed_cookie(UserClaims{
+        id: user_db.id_user.to_string(),
+        role: Role::Admin
+    }){
+        Ok(r)=>r,
+        Err(_) =>return  HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors: Some(CustomError::CreatingCookieError.error_response())
+        })
+    };
+    cookie.set_secure(false);
+    
+
+    HttpResponse::Accepted().cookie(cookie).json(Response{
+        data: Some(ResponseText::LoggedIn.to_string()),
+        errors: None,
+    })
+}
+#[post("/sing-in")]
+async fn sign_in(data: web::Data<AppState>, user: web::Json<UserData>) -> HttpResponse {
+    let conn = &data.conn;
+
+    let hash_password =match  bcrypt::hash(user.password.to_string()) {
+        Ok(r)=>r,
+        Err(_)=> return HttpResponse::BadRequest().json(Response{
+            data:None,
+            errors: Some(CustomError::SavigError.error_response()),
+        })
+    };
+
+    let user_id = uuid::Uuid::new_v4().to_string();
+    let account =ActiveModelUser{
+        id_user: Set(user_id),
+        username: Set(user.username.to_string()),
+        password: Set(hash_password),
+        role: Set(Role::Admin.to_string())
+
+    };
+    match account.insert(conn).await {
+        Ok(_) => return HttpResponse::Ok().json(Response{
+            data: Some(ResponseText::SingIn.to_string()),
+            errors: None,
+        }),
+        Err(_) => return HttpResponse::BadRequest().json(Response{
+            data: None,
+            errors: Some(CustomError::SavigError.error_response())
+        })
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
 
 #[get("/files/{id}")]
 async fn get_file(data: web::Data<AppState>,id: web::Path<String>) -> HttpResponse{
@@ -230,23 +357,34 @@ async fn main() -> std::io::Result<()> {
     let env_data = EnvData::load().unwrap();
 
     let conn : DatabaseConnection = sea_orm::Database::connect( &env_data.database_url).await.expect("Error in conenction");
-    
+    let auth_authority = Authority::<UserClaims>::default();
     
     Migrator::up(&conn,None).await.expect("Error performing migrations");
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(AppState{ 
+                auth: auth_authority.clone(),
                 conn:conn.clone(),
                 env_data: env_data.clone(),
+                cookie: None
             }))
-            .app_data(MultipartFormConfig::default().file_limit(env_data.max_transfe_size))
+            .service(sign_in)
+            .service(login)
+            .app_data(MultipartFormConfig::default().file_limit(env_data.max_transfer_size))
+            .app_data(Data::new(auth_authority.clone()))
+            .service(web::scope("")
             .service(change_file)
             .service(delete_file)
             .service(get_file)
             .service(new_bucket)
             .service(save_file_in_bucket)
             .service(delete_bucket)
+            .wrap(AuthService::new(
+                auth_authority.clone(),
+                // we pass the guard function to use with this auth service
+                verify_service_request,
+            )))
             .wrap(Logger::default())
 
     })

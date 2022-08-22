@@ -1,4 +1,5 @@
 
+use migration::error;
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
 
@@ -22,6 +23,14 @@ pub enum CustomError {
     DatabaseError,
     #[error("Error accrued while savinga data in database.")]
     SavigError,
+    #[error("Error creating cookie")]
+    CreatingCookieError,
+    #[error("No user with that username.")]
+    NoUser,
+    #[error("Incorrect password")]
+    IncorrectPassword,
+    
+    
 }   
 impl CustomError {
     pub fn error_response(&self) -> String {
