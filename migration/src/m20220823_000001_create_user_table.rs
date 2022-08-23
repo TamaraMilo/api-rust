@@ -1,3 +1,5 @@
+
+
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -9,43 +11,33 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Info::Table)
+                    .table( Bucket::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Info::Id)
+                        ColumnDef::new(Bucket::BucketId)
                             .not_null()
                             .primary_key()
                             .string(),
                     )
-                    .col(ColumnDef::new(Info::Extension)
-                            .string()
-                            .not_null())
-                    .col(ColumnDef::new(Info::Path)
-                            .string()
-                            .not_null())
-                    .col(ColumnDef::new(Info::UserId)
-                            .string()
-                            .not_null())
-                    
-                    .to_owned(),
 
+                        .col(ColumnDef::new(Bucket::UserId)
+                            .string()
+                            .not_null())
+                    .to_owned(),
             )
             .await
-      
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Info::Table).to_owned())
+            .drop_table(Table::drop().table(Bucket::Table).to_owned())
             .await
     }
 }
 
 #[derive(Iden)]
-enum Info {
+enum Bucket {
     Table,
-    Id,
-    Extension,
-    Path,
+    BucketId,
     UserId,
 }

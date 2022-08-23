@@ -25,7 +25,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(User::Password)
                             .string()
                             .not_null())
-                    .col(ColumnDef::new(User::Role)
+                        .col(ColumnDef::new(User::Role)
                             .string()
                             .not_null())
                     .to_owned(),
