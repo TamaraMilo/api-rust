@@ -5,14 +5,8 @@ use thiserror::Error;
 
 #[derive(Debug,Error,Serialize,Deserialize)]
 pub enum DatabaseError {
-    
-    
     #[error("Database error.")]
     DatabaseError,
-
-
-    
-    
 }   
 impl DatabaseError {
     pub fn error_response(&self) -> String {
@@ -22,11 +16,11 @@ impl DatabaseError {
 
 #[derive(Debug,Error,Serialize,Deserialize)]
 pub enum FileError {
-    #[error("Error accrued while writing data in file.")]
+    #[error("Error occured while writing data in file.")]
     WritingFileError,
-    #[error("Error acccrued while deleting a file.")]
+    #[error("Error occcrued while deleting a file.")]
     DeletingFileError,
-    #[error("Error accrued while changing data in file.")]
+    #[error("Error occrued while changing data in file.")]
     ChangeFileError,
     #[error("File do not exist.")]
     NoFileError,
@@ -62,10 +56,16 @@ pub enum LoggingError {
     CreatingCookieError,
     #[error("Error logging in")]
     NoUser,
-    #[error("Incorrect password or username.")]
-    IncorrectPassword,
+    #[error("Incorrect password or username or email.")]
+    IncorrectUserPassword,
     #[error("You not logged in.")]
     LoggedOut,
+    #[error("Password Must Contain At Least One Upper Case, Lower Case and Number. Dont use spaces. Password mut be at least 8 characters long. Username must contain number and alphabets only and must be at least 6 characters long ")]
+    PassAndUsernameError,
+    #[error("User with that username already exist.")]
+    UsernameError,
+    #[error("User with that email already exist")]
+    EmailError
 }
 impl LoggingError {
     pub fn error_response(&self) -> String {
