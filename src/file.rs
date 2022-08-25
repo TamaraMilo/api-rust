@@ -4,8 +4,13 @@ use std::fs::File;
 use std::io::{prelude::*};
 use entity::info::Model;
 use uuid::Uuid;
-use actix_easy_multipart::File as OtherFile;
+use actix_easy_multipart::{File as OtherFile, FromMultipart};
 
+
+#[derive(FromMultipart,Debug)]
+pub struct UploadData {
+   pub image: OtherFile,
+}
 
 
 

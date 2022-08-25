@@ -1,12 +1,15 @@
 use actix_web::{delete, post, put, get, web, App, HttpResponse, HttpServer, HttpRequest};
 mod errors;
-use validator::{Validate};
 mod file;
 mod bucket;
-mod structures;
+
+mod context;
+mod auth;
 mod responses;
+use auth::UserClaims;
+use context::EnvData;
 use file::FileInfo;
-use structures::{EnvData,LoginResponse,AppState,};
+
 use sea_orm::{DatabaseConnection, ActiveModelTrait, Set, EntityTrait, QueryFilter, ColumnTrait};
 use migration::{Migrator, MigratorTrait, Condition};
 use actix_web::middleware::{Logger};
@@ -22,9 +25,13 @@ use dotenv::dotenv;
 use bucket::Bucket;
 use actix_jwt_auth_middleware::{Authority, AuthService};
 use pwhash::bcrypt;
+use validator::Validate;
+use crate::auth::{LoginRequest, SingInRequest, validate};
+use crate::context::AppState;
 use crate::errors::{FileError, BucketError, LoggingError, DatabaseError};
-use crate::responses::ResponseText;
-use crate::structures::{Response, LogginData, UserData, Upload, validate, FileDetails, UserClaims};
+use crate::file::UploadData;
+use crate::responses::{ResponseText, Response, LoginResponse, FileDetailsResponse};
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -54,7 +61,7 @@ async fn logout(req: HttpRequest) -> HttpResponse{
     })
 }
 #[get("/login")] 
-async fn login( data: web::Data<AppState>, user: web::Json<LogginData>) -> HttpResponse {
+async fn login( data: web::Data<AppState>, user: web::Json<LoginRequest>) -> HttpResponse {
 
     let conn=&data.conn;
 
@@ -110,7 +117,7 @@ async fn login( data: web::Data<AppState>, user: web::Json<LogginData>) -> HttpR
     })
 }
 #[post("/sing-in")]
-async fn sign_in(data: web::Data<AppState>, user: web::Json<UserData>) -> HttpResponse {
+async fn sign_in(data: web::Data<AppState>, user: web::Json<SingInRequest>) -> HttpResponse {
     let conn = &data.conn;
     match user.validate() {
         Ok(_)=>(),
@@ -254,7 +261,7 @@ async fn get_file(data: web::Data<AppState>,id: web::Path<String>,user_claims:Us
 
 }
 #[post("/files/{bucketId}")]
-async fn save_file_in_bucket(data: web::Data<AppState>,bucket_id: web::Path<String>, mut payload: MultipartForm<Upload>,user_claims: UserClaims) -> HttpResponse {
+async fn save_file_in_bucket(data: web::Data<AppState>,bucket_id: web::Path<String>, mut payload: MultipartForm<UploadData>,user_claims: UserClaims) -> HttpResponse {
    
     let conn = &data.conn;
 
@@ -290,6 +297,7 @@ async fn save_file_in_bucket(data: web::Data<AppState>,bucket_id: web::Path<Stri
             errors: Some(BucketError::BucketNotExisting.error_response())
         })
     };
+    
     let file = ActiveModel {
         id: Set(file_info.id.to_string()),
         extension: Set(file_info.extension.to_string()),
@@ -315,7 +323,7 @@ async fn save_file_in_bucket(data: web::Data<AppState>,bucket_id: web::Path<Stri
    
 }
 #[put("/files/{id}")]
-async fn change_file(data: web::Data<AppState>,id: web::Path<String>,mut payload: MultipartForm<Upload>, user_claims: UserClaims) -> HttpResponse {
+async fn change_file(data: web::Data<AppState>,id: web::Path<String>,mut payload: MultipartForm<UploadData>, user_claims: UserClaims) -> HttpResponse {
     
     let conn = &data.conn;
 
@@ -355,7 +363,7 @@ async fn change_file(data: web::Data<AppState>,id: web::Path<String>,mut payload
     file.extension = Set(new_file_info.extension.to_string());
     match file.update(conn).await{
         Ok(_)=> return HttpResponse::Ok().json(Response {
-            data: Some(FileDetails{
+            data: Some(FileDetailsResponse{
                 id: id.to_string(),
                 path: new_file_info.path,
                 extension: new_file_info.extension .to_string(),

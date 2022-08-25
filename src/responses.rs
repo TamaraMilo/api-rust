@@ -1,5 +1,8 @@
 use std::fmt;
 
+use entity::user::Role;
+use serde::{Serialize, Deserialize};
+
 pub enum ResponseText {
     LoggedIn,
     SingIn,
@@ -14,4 +17,26 @@ impl fmt::Display for ResponseText {
             ResponseText::LoggedOut=> write!(f,"You are logged out")
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub user_id: String,
+    pub username: String,
+    pub email: String,
+    pub role: Role,
+}
+
+#[derive(Serialize)]
+pub struct Response<T>
+{
+    pub data: Option<T>,
+    pub errors: Option<T>
+}
+//response
+#[derive(Serialize)]
+pub struct FileDetailsResponse {
+    pub id: String,
+    pub extension:String,
+    pub path:String,
 }
