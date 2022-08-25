@@ -1,13 +1,10 @@
-
 use actix_web::{delete, post, put, get, web, App, HttpResponse, HttpServer, HttpRequest};
 mod errors;
 use validator::{Validate};
 mod file;
-mod auth;
 mod bucket;
 mod structures;
 mod responses;
-use auth::{UserClaims};
 use file::FileInfo;
 use structures::{EnvData,LoginResponse,AppState,};
 use sea_orm::{DatabaseConnection, ActiveModelTrait, Set, EntityTrait, QueryFilter, ColumnTrait};
@@ -27,7 +24,7 @@ use actix_jwt_auth_middleware::{Authority, AuthService};
 use pwhash::bcrypt;
 use crate::errors::{FileError, BucketError, LoggingError, DatabaseError};
 use crate::responses::ResponseText;
-use crate::structures::{Response, LogginData, UserData, Upload, validate, FileDetails};
+use crate::structures::{Response, LogginData, UserData, Upload, validate, FileDetails, UserClaims};
 #[macro_use]
 extern crate lazy_static;
 
@@ -155,7 +152,7 @@ async fn sign_in(data: web::Data<AppState>, user: web::Json<UserData>) -> HttpRe
         username: Set(user.username.to_string()),
         password: Set(hash_password),
         email: Set(user.email.to_string()),
-        role: Set(Role::User)
+        role: Set(Role::default())
 
     };
     match account.insert(conn).await {

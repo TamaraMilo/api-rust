@@ -1,12 +1,10 @@
 use actix_easy_multipart::{FromMultipart, File};
-use actix_jwt_auth_middleware::Authority;
+use actix_jwt_auth_middleware::{Authority, FromRequest};
 use entity::user::Role;
 use regex::Regex;
 use sea_orm::DatabaseConnection;
 use serde::{Serialize, Deserialize};
 use validator::{Validate, ValidationError};
-
-use crate::auth::UserClaims;
 
 
 #[derive(Clone)]
@@ -71,6 +69,12 @@ pub fn validate(id: String, user_claims_id: String, user_role: Role) -> bool {
     }
     true
 }
+#[derive(Serialize,Deserialize,Clone,FromRequest)]
+pub struct UserClaims  {
+    pub id: String,
+    pub role: Role
+}
+
 
 #[derive(Debug,Clone)]
 pub struct EnvData{

@@ -13,6 +13,11 @@ pub enum Role {
     #[sea_orm(string_value = "User")]
     User
 }
+impl Default for Role {
+    fn default() -> Self {
+        Role::User
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Deserialize, Serialize)]
 #[sea_orm(table_name = "user")]
