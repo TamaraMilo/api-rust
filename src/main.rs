@@ -1,131 +1,39 @@
 
 use actix_web::{delete, post, put, get, web, App, HttpResponse, HttpServer, HttpRequest};
 mod errors;
-use validator::{Validate, ValidationError};
+use validator::{Validate};
 mod file;
 mod auth;
 mod bucket;
+mod structures;
 mod responses;
 use auth::{UserClaims};
 use file::FileInfo;
-use sea_orm::{DatabaseConnection, ActiveModelTrait, Set, EntityTrait, QueryFilter, ColumnTrait, QueryTrait, DbBackend};
+use structures::{EnvData,LoginResponse,AppState,};
+use sea_orm::{DatabaseConnection, ActiveModelTrait, Set, EntityTrait, QueryFilter, ColumnTrait};
 use migration::{Migrator, MigratorTrait, Condition};
 use actix_web::middleware::{Logger};
 use entity::info::{ ActiveModel, Model};
 use entity::info::Entity as Info;
-use entity::user::{ActiveModel as ActiveModelUser, self};
+use entity::user::{ActiveModel as ActiveModelUser};
 use entity::user::Role;
 use entity::user::Entity as User;
 use entity::bucket::Entity as BucketEntity;
 use entity::bucket::ActiveModel as ActiveModelBucket;
-use actix_easy_multipart::{FromMultipart,File};
 use actix_easy_multipart::extractor::{MultipartForm,MultipartFormConfig};
-use serde::{Serialize, Deserialize};
 use dotenv::dotenv;
 use bucket::Bucket;
 use actix_jwt_auth_middleware::{Authority, AuthService};
 use pwhash::bcrypt;
 use crate::errors::{FileError, BucketError, LoggingError, DatabaseError};
 use crate::responses::ResponseText;
+use crate::structures::{Response, LogginData, UserData, Upload, validate, FileDetails};
+#[macro_use]
+extern crate lazy_static;
 
 
 
-#[derive(Clone)]
-struct AppState{
-    conn: DatabaseConnection,
-    env_data: EnvData,
-    auth: Authority<UserClaims>,
-}
-#[derive(Serialize, Deserialize, Validate)]
-struct UserData {
 
-    username: String,
-    #[validate(email)]
-    email:String,
-    #[validate(custom(function ="is_password_valid"))]
-    password: String,
-}
-#[derive(Serialize, Deserialize)]
-struct LogginData {
-    identifier: String,
-    password: String,
-}
-#[derive(Serialize, Deserialize)]
-struct LoginResponse {
-    user_id: String,
-    username: String,
-    email: String,
-    role: Role,
-}
-
-
-fn is_password_valid(password: &str) -> Result<(), ValidationError> {
-    let mut has_whitespace = false;
-    let mut has_upper = false;
-    let mut has_lower = false;
-    let mut has_digit = false;
-
-    for c in password.chars() {
-
-        has_whitespace |= c.is_whitespace();
-        has_lower |= c.is_lowercase();
-        has_upper |= c.is_uppercase();
-        has_digit |= c.is_digit(10);
-    }
-
-    if !has_whitespace && has_upper && has_lower && has_digit && password.len() >= 8 {
-        Ok(())
-    }else {
-        return Err(ValidationError::new("terrible_password"));
-    }
-}
-
-
-fn validate(id: String, user_claims_id: String, user_role: Role) -> bool {
-    if id != user_claims_id {
-        if user_role != Role::Admin {
-          return false;
-        }
-    }
-    true
-}
-
-#[derive(Debug,Clone)]
-pub struct EnvData{
-    database_url:  String,
-    basic_storage: String,
-    max_transfer_size: usize,
-  
-}
-
-impl EnvData {
-    pub fn load()-> std::io::Result<Self> {   
-        let database_url = dotenv::var("DATABASE_URL").unwrap();
-        let basic_storage = dotenv::var("BASIC_STORAGE").unwrap();
-        let max_transfer_size = dotenv::var("MAX_TRANSFER_SIZE").unwrap().parse::<i32>().unwrap().try_into().unwrap(); 
-        Ok(Self{
-            database_url,
-            basic_storage,
-            max_transfer_size,
-        })
-    }
-}
-#[derive(FromMultipart,Debug)]
-struct Upload {
-   image: File,
-}
-#[derive(Serialize)]
-struct Response<T>
-{
-    data: Option<T>,
-    errors: Option<T>
-}
-#[derive(Serialize)]
-struct FileDetails {
-    id: String,
-    extension:String,
-    path:String,
-}
 async fn verify_service_request(user_claims: UserClaims) ->bool{
     match user_claims.role {
         Role::Admin => true,
@@ -214,41 +122,25 @@ async fn sign_in(data: web::Data<AppState>, user: web::Json<UserData>) -> HttpRe
             errors:Some(LoggingError::PassAndUsernameError.error_response())
         })
     };
+ 
 
-  
-    let mut user_db = match  User::find()
-     .filter(entity::user::Column::Username.eq(user.username.to_string())).one(conn).await 
-    {
-        Ok(r)=>r,
-        Err(_) => return HttpResponse::BadRequest().json(Response{
-            data: None,
-            errors: Some(DatabaseError::DatabaseError.error_response())
-        })
-    };
+    let user_db = match User::find().filter(Condition::any()
+                            .add(entity::user::Column::Username.eq(user.username.to_string()))
+                            .add(entity::user::Column::Email.eq(user.email.to_string()))).one(conn).await {
+                                Ok(r)=>r,
+                                Err(_)=> return HttpResponse::BadRequest().json(Response{
+                                    data:None,
+                                    errors: Some(DatabaseError::DatabaseError.error_response())
+                                })
+                            };
     match user_db {
-        Some(_) => return HttpResponse::BadRequest().json(Response{
+        Some(_)=> return HttpResponse::BadRequest().json(Response{
             data: None,
-            errors: Some(LoggingError::UsernameError.error_response())
-            
+            errors: Some(LoggingError::UserExistError.error_response())
         }),
-        None=>()
+        None=>(),
     };
-    let mut user_db = match  User::find()
-    .filter(entity::user::Column::Email.eq(user.email.to_string())).one(conn).await 
-   {
-       Ok(r)=>r,
-       Err(_) => return HttpResponse::BadRequest().json(Response{
-           data: None,
-           errors: Some(DatabaseError::DatabaseError.error_response())
-       })
-   };
-    match user_db {
-       Some(_) => return HttpResponse::BadRequest().json(Response{
-           data: None,
-           errors: Some(LoggingError::EmailError.error_response())
-       }),
-       None=>()
-   };
+  
     let hash_password =match  bcrypt::hash(user.password.to_string()) {
         Ok(r)=>r,
         Err(_)=> return HttpResponse::BadRequest().json(Response{
@@ -314,8 +206,14 @@ async fn user_admin(data: web::Data<AppState>, user_id: web::Path<String>,user_c
     let mut user: ActiveModelUser = user.into();
     user.role = Set(Role::Admin);
     match user.update(conn).await {
-        Ok(r)=>return HttpResponse::Ok().json(Response{
-            data: Some(r),
+        Ok(user)=>return HttpResponse::Ok().json(Response{
+            data: Some(LoginResponse{
+                user_id: user.user_id,
+                username: user.username,
+                email: user.email,
+                role: user.role
+
+            }),
             errors: None
         }),
         Err(_)=> return HttpResponse::BadRequest().json(Response{

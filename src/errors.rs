@@ -62,10 +62,8 @@ pub enum LoggingError {
     LoggedOut,
     #[error("Password Must Contain At Least One Upper Case, Lower Case and Number. Dont use spaces. Password mut be at least 8 characters long. Username must contain number and alphabets only and must be at least 6 characters long ")]
     PassAndUsernameError,
-    #[error("User with that username already exist.")]
-    UsernameError,
-    #[error("User with that email already exist")]
-    EmailError
+    #[error("User with that username or email already exist.")]
+    UserExistError,
 }
 impl LoggingError {
     pub fn error_response(&self) -> String {
