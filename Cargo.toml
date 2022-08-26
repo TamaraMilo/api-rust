@@ -25,6 +25,7 @@ regex = "1"
 validator = { version = "0.12", features = ["derive"] }
 lazy_static = "1.4.0"
 fancy-regex = "0.10.0"
+derive_more = "0.99.17"
 
 [dependencies.uuid]
 version = "1.1.2"

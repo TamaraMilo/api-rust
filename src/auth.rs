@@ -6,7 +6,7 @@ use validator::{Validate, ValidationError};
 
 
 //auth
-#[derive(Serialize, Deserialize, Validate)]
+#[derive(Serialize, Deserialize, Validate, Clone)]
 pub struct SingInRequest {
     #[validate(custom="is_username_valid")]
     pub username: String,
@@ -20,6 +20,11 @@ pub struct SingInRequest {
 pub struct LoginRequest {
     pub identifier: String,
     pub password: String,
+}
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UserIdetifier{
+    pub email: String,
+    pub username: String,
 }
 
 #[derive(Serialize,Deserialize,Clone,FromRequest)]
@@ -57,7 +62,7 @@ fn is_username_valid(username: &str) -> Result<(), ValidationError> {
     if valid {
         Ok(())
     }else {
-        return Err(ValidationError::new("terrible_password"));
+        return Err(ValidationError::new("terrible_username"));
     }
 }
 
