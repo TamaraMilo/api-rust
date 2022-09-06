@@ -35,6 +35,11 @@ pub enum Errors {
     #[display(fmt="User with that username or email already exist.")]
     UserExistError,
     Unauthorized,
+    #[display(fmt="Singning in error.")]
+    SingInError,
+    #[display(fmt="Internal error")]
+    InternalError
+
    
 }   
 impl error::ResponseError for Errors {
@@ -59,6 +64,8 @@ impl error::ResponseError for Errors {
             Errors::PassAndUsernameError => StatusCode::BAD_REQUEST,
             Errors::Unauthorized => StatusCode::UNAUTHORIZED,
             Errors::UserExistError => StatusCode::BAD_REQUEST,
+            Errors::SingInError=> StatusCode::BAD_REQUEST,
+            Errors::InternalError =>  StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

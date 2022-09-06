@@ -1,6 +1,7 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
+
 #[derive(Clone, Debug, PartialEq, EnumIter, DeriveActiveEnum,Serialize, Deserialize)]
 #[sea_orm(
     rs_type = "String",
@@ -32,11 +33,12 @@ pub struct Model {
 }
 
 
+
+
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
-
 
 
 

@@ -12,9 +12,7 @@ pub struct UploadData {
    pub image: OtherFile,
 }
 
-
-
-pub struct FileInfo {
+pub struct FileManager {
     pub id: Uuid,
     pub buf: Vec<u8>,
     pub extension: String,
@@ -26,7 +24,7 @@ pub struct ChangeArgs<'a> {
     pub file_info: &'a Model 
 }
 
-impl FileInfo {
+impl FileManager {
     pub fn new(file: &mut OtherFile,bucket_id: String,storage: &str ) -> std::io::Result<Self> {
         
         let id = Uuid::new_v4();
@@ -54,7 +52,7 @@ impl FileInfo {
         fs::remove_file(path)
     }
 
-    pub fn change_data(arguments: ChangeArgs) -> Result<FileInfo, std::io::Error> {
+    pub fn change_data(arguments: ChangeArgs) -> Result<FileManager, std::io::Error> {
         fs::remove_file(arguments.file_info.path.clone())?;
         let extension = match arguments.data.get_extension(){
             Some(r) => r.to_string(),
@@ -67,12 +65,9 @@ impl FileInfo {
         let mut file = File::create(new_path.clone())?;
         file.write_all(&buf)?;
 
-        let  id =match  Uuid::parse_str(&arguments.file_info.id) {
-            Ok(r)=>r,
-            Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Error getting file name"))
-        };
+        let id = Uuid::parse_str(&arguments.file_info.id).map_err(|_| return std::io::Error::new(std::io::ErrorKind::InvalidData, "Error getting file name"))?;
 
-        Ok(FileInfo{
+        Ok(FileManager{
             id: id,
             path: new_path,
             extension: extension,
