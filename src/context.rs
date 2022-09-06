@@ -7,7 +7,7 @@ use crate::auth::dto::UserClaims;
 pub struct AppState{
     pub conn: DatabaseConnection,
     pub env_data: EnvData,
-    pub auth: Authority<UserClaims>,
+
 }
 
 #[derive(Debug,Clone)]

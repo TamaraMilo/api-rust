@@ -6,7 +6,7 @@ use crate::{context::AppState, errors::{ Errors}, file::{file_service::{getFile,
 
 
 
-#[get("{id}")]
+#[get("file/{id}")]
 #[has_any_role("User","Admin")]
 async fn get_file(
     data: web::Data<AppState>,
@@ -18,7 +18,7 @@ async fn get_file(
         .await.map_err(|e| return e)?;   
     Ok(HttpResponse::Ok().json(file_info))
 }
-#[post("{bucketId}")]
+#[post("file/{bucketId}")]
 #[has_any_role("User","Admin")]
 async fn create_file(
     data: web::Data<AppState>,
@@ -31,7 +31,7 @@ async fn create_file(
     .await.map_err(|e|  return e)?;
     Ok(HttpResponse::Ok().json(file))
 }
-#[put("{id}")]
+#[put("file/{id}")]
 #[has_any_role("User","Admin")]
 async fn change_file(
     data: web::Data<AppState>,
@@ -46,7 +46,7 @@ async fn change_file(
 
     Ok(HttpResponse::Ok().json(file))
 }
-#[delete("{id}")]
+#[delete("file/{id}")]
 #[has_any_role("User","Admin")]
 async fn delete_file(
     data: web::Data<AppState>,

@@ -22,6 +22,7 @@ pub fn decode_jwt(token: &str) -> Result<Claims, Error> {
 
 pub async fn validator(req: ServiceRequest, credentials: BearerAuth) -> Result<ServiceRequest, (Error, ServiceRequest)>
 {
+    println!("uslo");
     let result = decode_jwt(credentials.token());
     match result {
         Ok(claims) =>
