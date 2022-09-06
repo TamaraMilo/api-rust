@@ -5,11 +5,11 @@ use crate::{
     errors::Errors,
 };
 use actix_web::{delete, post, web, HttpResponse};
-use actix_web_grants::proc_macro::{ has_any_role};
+use actix_web_grants::proc_macro::{  has_permissions};
 
 
 #[post("bucket/")]
-#[has_any_role("User","Admin")]
+#[has_permissions("User","Admin")]
 async fn new_bucket(
     data: web::Data<AppState>,
     user_claims: UserClaims,
@@ -21,7 +21,7 @@ async fn new_bucket(
 }
 
 #[delete("bucket/{bucket_id}")]
-#[has_any_role("User","Admin")]
+#[has_permissions("User","Admin")]
 async fn delete_bucket(
     bucket_id: web::Path<String>,
     data: web::Data<AppState>,

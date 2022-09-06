@@ -1,15 +1,14 @@
 use actix_web::{ HttpResponse, web, put};
-use actix_web_grants::proc_macro::has_any_role;
+use actix_web_grants::proc_macro::{has_any_role, has_permissions};
 use crate::{errors::Errors, context::AppState, user::{user_repository::{ update_user}, }, auth::dto::{UserData, UserClaims}};
 
 
 
 #[put("/{user_id}/role")]
-#[has_any_role("Admin")]
+#[has_permissions("Admin")]
 async fn user_admin(
     data: web::Data<AppState>,
-    user_id: web::Path<String>,
-    user_claims: UserClaims,
+    user_id: web::Path<String>
 ) -> Result<HttpResponse, Errors> {
     let conn = &data.conn;
 

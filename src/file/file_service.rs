@@ -2,6 +2,7 @@ use super::dto::FileInfoDTO;
 use super::file_manager::{ChangeArgs, FileManager, UploadData};
 use super::file_repository::FileInfo;
 use crate::auth::auth_service::user_verify;
+use crate::auth::claims::Claims;
 use crate::auth::dto::UserClaims;
 use crate::bucket::bucket_repository::Bucket;
 use crate::repository::Reposiory;
@@ -13,7 +14,7 @@ use entity::info::Model as FileModel;
 pub async fn getFile(
     data: web::Data<AppState>,
     id: web::Path<String>,
-    user_claims: UserClaims,
+    credentials: BearerAuth,
 ) -> Result<FileModel, Errors> {
     let file = FileInfo::new(data.conn.clone());
     let fileModule = file
@@ -30,14 +31,14 @@ pub async fn createFile(
     data: web::Data<AppState>,
     bucket_id: web::Path<String>,
     mut payload: MultipartForm<UploadData>,
-    user_claims: UserClaims,
+    user_claims: Claims
 ) -> Result<FileModel, Errors> {
     let bucket = Bucket::new(data.conn.clone());
     let bucketModel = bucket
         .read(bucket_id.to_string())
         .await
         .map_err(|_| return Errors::BucketNotExisting)?;
-    if !user_verify(bucketModel.user_id, user_claims.clone()) {
+    if !user_verify(bucketModel.user_id, user_claims) {
         return Err(Errors::Unauthorized);
     }
     let infoFileManager = FileManager::new(
@@ -65,7 +66,7 @@ pub async fn changeFile(
     data: web::Data<AppState>,
     id: web::Path<String>,
     mut payload: MultipartForm<UploadData>,
-    user_claims: UserClaims,
+    credentials: BearerAuth,
 ) -> Result<FileModel, Errors> {
     let file = FileInfo::new(data.conn.clone());
     let fileModel = file
@@ -97,7 +98,7 @@ pub async fn changeFile(
 pub async fn deleteFile(
     data: web::Data<AppState>,
     id: web::Path<String>,
-    user_claims: UserClaims,
+    credentials: BearerAuth,
 ) -> Result<(), Errors> {
     let file = FileInfo::new(data.conn.clone());
     let fileModel = file

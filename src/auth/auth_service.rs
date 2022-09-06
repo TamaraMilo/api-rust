@@ -12,10 +12,11 @@ use entity::user::Role;
 use pwhash::bcrypt;
 use validator::Validate;
 
-use super::dto::{LoginRequest, UserData, UserClaims};
+use super::claims::Claims;
+use super::dto::{LoginRequest, UserData};
 
-pub fn user_verify(id: String, user_claims: UserClaims) -> bool {
-    if id != user_claims.id {
+pub fn user_verify(id: String, user_claims: Claims) -> bool {
+    if id != user_claims.user_id {
         if user_claims.role != Role::Admin {
             return false;
         }

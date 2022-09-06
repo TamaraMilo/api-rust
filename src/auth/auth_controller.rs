@@ -45,7 +45,7 @@ async fn singin(
     // cookie.set_secure(false);
 
     let token = create_jwt(
-        Claims::new(user_db.username.to_string(), user_db.role.clone()),
+        Claims::new(user_db.username.to_string(), user_db.role.clone(), user_db.user_id.to_string()),
         data,
     )
     .map_err(|_| return Errors::SingInError)?;
