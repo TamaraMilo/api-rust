@@ -1,6 +1,6 @@
 use super::{bucket_manager::BucketManager, bucket_repository::Bucket, dto::BucketDTO};
 use crate::{
-    auth::{auth_service::user_verify, dto::UserClaims},
+    auth::{auth_service::user_verify, claims::Claims},
     context::AppState,
     errors::Errors,
     repository::Reposiory,
@@ -10,7 +10,7 @@ use entity::bucket::Model as BucketModel;
 
 pub async fn newBucket(
     data: web::Data<AppState>,
-    user_claims: UserClaims,
+    user_claims: Claims,
 ) -> Result<BucketModel, Errors> {
     let bucketInfo = BucketManager::new(&data.env_data.basic_storage)
         .map_err(|_| return Errors::BucketCreateError)?;
@@ -18,7 +18,7 @@ pub async fn newBucket(
     let bucketModel = bucket
         .create(BucketDTO {
             bucket_id: bucketInfo.id.to_string(),
-            user_id: user_claims.id,
+            user_id: user_claims.user_id,
         })
         .await
         .map_err(|_| return Errors::DatabaseError)?;
@@ -29,7 +29,7 @@ pub async fn newBucket(
 pub async fn deleteBucket(
     bucket_id: web::Path<String>,
     data: web::Data<AppState>,
-    user_claims: UserClaims,
+    user_claims: Claims,
 ) -> Result<(), Errors> {
     let bucket = Bucket::new(data.conn.clone());
     let bucket_model = bucket

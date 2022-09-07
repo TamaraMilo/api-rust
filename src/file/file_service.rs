@@ -3,7 +3,6 @@ use super::file_manager::{ChangeArgs, FileManager, UploadData};
 use super::file_repository::FileInfo;
 use crate::auth::auth_service::user_verify;
 use crate::auth::claims::Claims;
-use crate::auth::dto::UserClaims;
 use crate::bucket::bucket_repository::Bucket;
 use crate::repository::Reposiory;
 use crate::{context::AppState, errors::Errors};
@@ -14,7 +13,7 @@ use entity::info::Model as FileModel;
 pub async fn getFile(
     data: web::Data<AppState>,
     id: web::Path<String>,
-    credentials: BearerAuth,
+    user_claims: Claims,
 ) -> Result<FileModel, Errors> {
     let file = FileInfo::new(data.conn.clone());
     let fileModule = file
@@ -31,14 +30,14 @@ pub async fn createFile(
     data: web::Data<AppState>,
     bucket_id: web::Path<String>,
     mut payload: MultipartForm<UploadData>,
-    user_claims: Claims
+    user_claims: Claims,
 ) -> Result<FileModel, Errors> {
     let bucket = Bucket::new(data.conn.clone());
     let bucketModel = bucket
         .read(bucket_id.to_string())
         .await
         .map_err(|_| return Errors::BucketNotExisting)?;
-    if !user_verify(bucketModel.user_id, user_claims) {
+    if !user_verify(bucketModel.user_id, user_claims.clone()) {
         return Err(Errors::Unauthorized);
     }
     let infoFileManager = FileManager::new(
@@ -54,7 +53,7 @@ pub async fn createFile(
             id: infoFileManager.id.to_string(),
             extension: infoFileManager.extension.to_string(),
             path: infoFileManager.path.to_string(),
-            user_id: user_claims.id.to_string(),
+            user_id: user_claims.user_id.to_string(),
         })
         .await
         .map_err(|_| return Errors::DatabaseError)?;
@@ -66,7 +65,7 @@ pub async fn changeFile(
     data: web::Data<AppState>,
     id: web::Path<String>,
     mut payload: MultipartForm<UploadData>,
-    credentials: BearerAuth,
+    user_claims: Claims,
 ) -> Result<FileModel, Errors> {
     let file = FileInfo::new(data.conn.clone());
     let fileModel = file
@@ -88,7 +87,7 @@ pub async fn changeFile(
             id: new_file_info.id.to_string(),
             extension: new_file_info.extension,
             path: new_file_info.path,
-            user_id: user_claims.id,
+            user_id: user_claims.user_id.to_string(),
         })
         .await
         .map_err(|_| return Errors::ChangeFileError)?;
@@ -98,14 +97,14 @@ pub async fn changeFile(
 pub async fn deleteFile(
     data: web::Data<AppState>,
     id: web::Path<String>,
-    credentials: BearerAuth,
+    user_claims: Claims,
 ) -> Result<(), Errors> {
     let file = FileInfo::new(data.conn.clone());
     let fileModel = file
         .read(id.to_string())
         .await
         .map_err(|_| return Errors::NoFileError)?;
-    if !user_verify(fileModel.id.to_string(), user_claims.clone()) {
+    if !user_verify(fileModel.id.to_string(), user_claims) {
         return Err(Errors::Unauthorized);
     }
 

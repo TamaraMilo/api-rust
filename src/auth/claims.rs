@@ -2,7 +2,7 @@ use chrono::{Duration, Utc};
 use entity::user::Role;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct Claims {
     pub username: String,
     pub role: Role,
