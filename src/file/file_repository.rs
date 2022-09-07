@@ -21,6 +21,7 @@ impl Reposiory<FileModel, FileInfoDTO> for FileInfo {
             extension: dto.extension.to_string(),
             path: dto.path.to_string(),
             user_id: dto.user_id.to_string(),
+            bucket_id: dto.bucket_id.to_string()
         }
         .into_active_model();
         file.insert(&self.conn).await

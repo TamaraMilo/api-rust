@@ -10,7 +10,7 @@ use crate::{
     errors::Errors,
     file::{
         file_manager::UploadData,
-        file_service::{changeFile, createFile, deleteFile, getFile},
+        file_service::{changeFile, createFile, deleteFile, getFile}, dto::ChangeFile,
     },
 };
 
@@ -34,7 +34,7 @@ async fn create_file(
     credentials: BearerAuth,
 ) -> Result<HttpResponse, Errors> {
     let user_claims = decode_jwt(credentials.token()).map_err(|_| return Errors::Unauthorized)?;
-    let file = createFile(data, bucket_id, payload, user_claims)
+    let file = createFile(data, payload, user_claims)
         .await
         .map_err(|e| return e)?;
     Ok(HttpResponse::Ok().json(file))
@@ -44,7 +44,7 @@ async fn create_file(
 async fn change_file(
     data: web::Data<AppState>,
     id: web::Path<String>,
-    payload: MultipartForm<UploadData>,
+    payload: MultipartForm<ChangeFile>,
     credentials: BearerAuth,
 ) -> Result<HttpResponse, Errors> {
     let user_claims = decode_jwt(credentials.token()).map_err(|_| return Errors::Unauthorized)?;

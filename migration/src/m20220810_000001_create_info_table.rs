@@ -26,7 +26,9 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Info::UserId)
                             .string()
                             .not_null())
-                    
+                    .col(ColumnDef::new(Info::BucketID)
+                            .string()
+                            .not_null())
                     .to_owned(),
 
             )
@@ -48,4 +50,5 @@ enum Info {
     Extension,
     Path,
     UserId,
+    BucketID,
 }

@@ -10,6 +10,7 @@ use actix_easy_multipart::{File as OtherFile, FromMultipart};
 #[derive(FromMultipart,Debug)]
 pub struct UploadData {
    pub image: OtherFile,
+   pub bucket: String,
 }
 
 pub struct FileManager {

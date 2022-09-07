@@ -1,4 +1,4 @@
-use super::dto::FileInfoDTO;
+use super::dto::{FileInfoDTO, ChangeFile};
 use super::file_manager::{ChangeArgs, FileManager, UploadData};
 use super::file_repository::FileInfo;
 use crate::auth::auth_service::user_verify;
@@ -28,13 +28,12 @@ pub async fn getFile(
 
 pub async fn createFile(
     data: web::Data<AppState>,
-    bucket_id: web::Path<String>,
     mut payload: MultipartForm<UploadData>,
     user_claims: Claims,
 ) -> Result<FileModel, Errors> {
     let bucket = Bucket::new(data.conn.clone());
     let bucketModel = bucket
-        .read(bucket_id.to_string())
+        .read(payload.bucket.to_string())
         .await
         .map_err(|_| return Errors::BucketNotExisting)?;
     if !user_verify(bucketModel.user_id, user_claims.clone()) {
@@ -42,7 +41,7 @@ pub async fn createFile(
     }
     let infoFileManager = FileManager::new(
         &mut payload.image,
-        bucket_id.to_string(),
+        bucketModel.bucket_id,
         &data.env_data.basic_storage,
     )
     .map_err(|_| return Errors::BucketNotExisting)?;
@@ -54,6 +53,7 @@ pub async fn createFile(
             extension: infoFileManager.extension.to_string(),
             path: infoFileManager.path.to_string(),
             user_id: user_claims.user_id.to_string(),
+            bucket_id: payload.bucket.to_string()
         })
         .await
         .map_err(|_| return Errors::DatabaseError)?;
@@ -64,7 +64,7 @@ pub async fn createFile(
 pub async fn changeFile(
     data: web::Data<AppState>,
     id: web::Path<String>,
-    mut payload: MultipartForm<UploadData>,
+    mut payload: MultipartForm<ChangeFile>,
     user_claims: Claims,
 ) -> Result<FileModel, Errors> {
     let file = FileInfo::new(data.conn.clone());
@@ -88,6 +88,7 @@ pub async fn changeFile(
             extension: new_file_info.extension,
             path: new_file_info.path,
             user_id: user_claims.user_id.to_string(),
+            bucket_id: fileModel.bucket_id.to_string()
         })
         .await
         .map_err(|_| return Errors::ChangeFileError)?;

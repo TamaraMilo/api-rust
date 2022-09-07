@@ -10,7 +10,8 @@ pub struct Model {
     pub id: String,
     pub extension: String,
     pub path: String,
-    pub user_id: String
+    pub user_id: String,
+    pub bucket_id: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
