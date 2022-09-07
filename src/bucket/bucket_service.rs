@@ -10,6 +10,7 @@ use entity::bucket::Model as BucketModel;
 
 pub async fn newBucket(
     data: web::Data<AppState>,
+    name: web::Path<String>,
     user_claims: Claims,
 ) -> Result<BucketModel, Errors> {
     let bucketInfo = BucketManager::new(&data.env_data.basic_storage)
@@ -19,6 +20,7 @@ pub async fn newBucket(
         .create(BucketDTO {
             bucket_id: bucketInfo.id.to_string(),
             user_id: user_claims.user_id,
+            name: name.to_string(),
         })
         .await
         .map_err(|_| return Errors::DatabaseError)?;

@@ -9,6 +9,7 @@ pub struct Model {
     #[serde(skip_deserializing)]
     pub bucket_id: String,
     pub user_id: String,
+    pub name: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

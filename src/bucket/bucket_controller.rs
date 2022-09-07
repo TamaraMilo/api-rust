@@ -13,10 +13,11 @@ use entity::user::Role::{self, Admin, User};
 #[has_any_role("Admin", "User", type = "Role")]
 async fn new_bucket(
     data: web::Data<AppState>,
+    name: web::Path<String>,
     credentials: BearerAuth,
 ) -> Result<HttpResponse, Errors> {
     let user_claims = decode_jwt(credentials.token()).map_err(|_| return Errors::Unauthorized)?;
-    let bucket = newBucket(data, user_claims)
+    let bucket = newBucket(data, name,user_claims)
         .await
         .map_err(|_| return Errors::BucketCreateError)?;
     Ok(HttpResponse::Ok().json(bucket))
@@ -35,3 +36,6 @@ async fn delete_bucket(
         .map_err(|e| e)?;
     Ok(HttpResponse::Ok().finish())
 }
+
+
+

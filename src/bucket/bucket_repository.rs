@@ -19,6 +19,7 @@ impl Reposiory<Model,BucketDTO> for Bucket
         let bucket = Model{
             bucket_id: dto.bucket_id.to_string(),
             user_id: dto.user_id.to_string(),
+            name: dto.name.to_string()
         }.into_active_model();
 
         bucket.insert(&self.conn).await 
