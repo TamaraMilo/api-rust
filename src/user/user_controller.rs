@@ -1,11 +1,12 @@
 use actix_web::{ HttpResponse, web, put};
-use actix_web_grants::proc_macro::{has_any_role, has_permissions};
-use crate::{errors::Errors, context::AppState, user::{user_repository::{ update_user}, }, auth::dto::{UserData, UserClaims}};
+use actix_web_grants::proc_macro::{has_any_role};
+use entity::user::Role::{Admin,self};
+use crate::{errors::Errors, context::AppState, user::{user_repository::{ update_user}, }, auth::dto::{UserData}};
 
 
 
 #[put("/{user_id}/role")]
-#[has_permissions("Admin")]
+#[has_any_role("Admin", type="Role")]
 async fn user_admin(
     data: web::Data<AppState>,
     user_id: web::Path<String>
