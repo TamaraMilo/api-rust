@@ -23,6 +23,9 @@ impl MigrationTrait for Migration {
                         .col(ColumnDef::new(Bucket::UserId)
                             .string()
                             .not_null())
+                        .col(ColumnDef::new(Bucket::Name)
+                            .string()
+                            .not_null())
                     .to_owned(),
             )
             .await
@@ -40,4 +43,5 @@ enum Bucket {
     Table,
     BucketId,
     UserId,
+    Name
 }
