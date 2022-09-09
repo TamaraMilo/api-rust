@@ -1,14 +1,16 @@
-use super::dto::{FileInfoDTO, ChangeFile};
+use super::dto::{ChangeFile, FileInfoDTO};
 use super::file_manager::{ChangeArgs, FileManager, UploadData};
-use super::file_repository::FileInfo;
+use super::file_repository::{self, FileInfo};
 use crate::auth::auth_service::user_verify;
 use crate::auth::claims::Claims;
+use crate::bucket;
 use crate::bucket::bucket_repository::Bucket;
 use crate::repository::Reposiory;
 use crate::{context::AppState, errors::Errors};
 use actix_easy_multipart::extractor::MultipartForm;
-use actix_web::web;
+use actix_web::{web, App};
 use entity::info::Model as FileModel;
+use futures_util::TryFutureExt;
 
 pub async fn getFile(
     data: web::Data<AppState>,
@@ -53,7 +55,7 @@ pub async fn createFile(
             extension: infoFileManager.extension.to_string(),
             path: infoFileManager.path.to_string(),
             user_id: user_claims.user_id.to_string(),
-            bucket_id: payload.bucket.to_string()
+            bucket_id: payload.bucket.to_string(),
         })
         .await
         .map_err(|_| return Errors::DatabaseError)?;
@@ -88,7 +90,7 @@ pub async fn changeFile(
             extension: new_file_info.extension,
             path: new_file_info.path,
             user_id: user_claims.user_id.to_string(),
-            bucket_id: fileModel.bucket_id.to_string()
+            bucket_id: fileModel.bucket_id.to_string(),
         })
         .await
         .map_err(|_| return Errors::ChangeFileError)?;
@@ -115,4 +117,37 @@ pub async fn deleteFile(
         .map_err(|_| return Errors::DeletingFileError)?;
 
     Ok(())
+}
+
+pub async fn read_files_from_bucket(
+    data: web::Data<AppState>,
+    bucket_id: web::Path<String>,
+) -> Result<Vec<FileModel>, Errors> {
+    let file_reposetory = FileInfo::new(data.conn.clone());
+    Ok(file_reposetory
+        .read_files_from_bucket(bucket_id.to_string())
+        .await
+        .map_err(|_| return Errors::NoFileError)?)
+}
+pub async fn read_files_from_bucket_in_page(
+    data: web::Data<AppState>,
+    bucket_id: web::Path<String>,
+    page_number: web::Path<usize>,
+    user_claims: Claims,
+) -> Result<Vec<FileModel>, Errors> {
+    let bucket_repository = Bucket::new(data.conn.clone());
+    let bucket = bucket_repository
+        .read(bucket_id.to_string())
+        .await
+        .map_err(|_| return Errors::NoBucketError)?;
+
+    if !user_verify(bucket.user_id, user_claims) {
+        return Err(Errors::Unauthorized);
+    }
+
+    let file_repository = FileInfo::new(data.conn.clone());
+    file_repository
+        .read_page(bucket_id.to_string(), page_number.to_be())
+        .await
+        .map_err(|_| return Errors::DatabaseError)
 }

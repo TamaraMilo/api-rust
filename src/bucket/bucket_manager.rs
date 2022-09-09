@@ -8,9 +8,9 @@ pub struct BucketManager {
 }
 
 impl BucketManager {
-    pub fn new(storage: &str) -> std::io::Result<Self> {
+    pub fn new(storage: &str, name: String) -> std::io::Result<Self> {
         let id = Uuid::new_v4();
-        let path = format!("{}{}", storage, id);
+        let path = format!("{}{}", storage, name);
 
         fs::create_dir(&path)?;
         Ok(Self { id })

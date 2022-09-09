@@ -13,12 +13,18 @@ pub async fn newBucket(
     name: web::Path<String>,
     user_claims: Claims,
 ) -> Result<BucketModel, Errors> {
-    let bucketInfo = BucketManager::new(&data.env_data.basic_storage)
+    let bucket_repository = Bucket::new(data.conn.clone());
+    let bucket  = bucket_repository.bucket_exist(name.to_string()).await.map_err(|_| return Errors::DatabaseError)?;
+    if bucket.is_some()
+    {
+        return Err(Errors::BucketNameErrors);
+    }
+    let bucket_info = BucketManager::new(&data.env_data.basic_storage, name.to_string())
         .map_err(|_| return Errors::BucketCreateError)?;
-    let bucket = Bucket::new(data.conn.clone());
-    let bucketModel = bucket
+   
+    let bucketModel = bucket_repository
         .create(BucketDTO {
-            bucket_id: bucketInfo.id.to_string(),
+            bucket_id: bucket_info.id.to_string(),
             user_id: user_claims.user_id,
             name: name.to_string(),
         })
@@ -49,3 +55,5 @@ pub async fn deleteBucket(
         .map_err(|_| return Errors::DatabaseError)?;
     Ok(())
 }
+
+

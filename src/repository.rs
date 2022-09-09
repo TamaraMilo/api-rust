@@ -10,4 +10,5 @@ pub trait Reposiory<K, T>
     async fn update(&self, dto: T) -> Result<K,DbErr>;
     async fn delete(&self, id: String) -> Result<DeleteResult,DbErr>;
     fn new(conn: DatabaseConnection) -> Self;
+
 }

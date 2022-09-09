@@ -20,7 +20,7 @@ pub enum Errors {
     BucketNotExisting,
     #[display(fmt="Error accrues while deleting bucket.")]
     BucketDeleteError,
-    #[display(fmt= "Bucket do not exist.")]
+    #[display(fmt= "Bucket not found.")]
     NoBucketError,
     #[display(fmt="Error creating cookie")]
     CreatingCookieError,
@@ -38,7 +38,10 @@ pub enum Errors {
     #[display(fmt="Singning in error.")]
     SingInError,
     #[display(fmt="Internal error")]
-    InternalError
+    InternalError,
+    #[display(fmt="Bucket with that name already exists.")]
+    BucketNameErrors,
+    
 
    
 }   
@@ -66,6 +69,7 @@ impl error::ResponseError for Errors {
             Errors::UserExistError => StatusCode::BAD_REQUEST,
             Errors::SingInError=> StatusCode::BAD_REQUEST,
             Errors::InternalError =>  StatusCode::INTERNAL_SERVER_ERROR,
+            Errors::BucketNameErrors => StatusCode::BAD_REQUEST,
         }
     }
 }
