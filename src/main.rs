@@ -15,8 +15,9 @@ mod bucket;
 mod context;
 mod errors;
 mod file;
+mod response_dto;
 mod repository;
-mod responses;
+
 mod user;
 #[macro_use]
 extern crate lazy_static;

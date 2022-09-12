@@ -3,7 +3,7 @@
 
 use actix_web::{error, HttpResponse, http::StatusCode};
 use derive_more::{Display,Error};
-use crate::responses::ErrorDto;
+use crate::response_dto::ErrorDto;
 
 #[derive(Debug, Error, Display)]
 pub enum UserError {

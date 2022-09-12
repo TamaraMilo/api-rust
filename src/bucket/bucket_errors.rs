@@ -1,6 +1,6 @@
 use actix_web::{error, http::StatusCode, HttpResponse};
 use derive_more::{Display, Error};
-use crate::responses::ErrorDto;
+use crate::response_dto::ErrorDto;
 
 #[derive(Debug, Error, Display)]
 pub enum BucketError {
