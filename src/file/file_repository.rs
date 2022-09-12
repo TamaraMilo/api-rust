@@ -57,14 +57,10 @@ impl Reposiory<FileModel, FileInfoDTO> for FileInfo {
 }
 
 impl FileInfo {
-    pub async fn read_files_from_bucket(&self, bucket_id: String) -> Result<Vec<FileModel>, DbErr> {
-        let condition = Condition::all().add(entity::info::Column::BucketId.eq(bucket_id));
-        FileEntity::find().filter(condition).all(&self.conn).await
-    }
  
-    pub async fn read_page(&self, bucket_id: String, page_number: usize) -> Result<Vec<FileModel>, DbErr> {
-        let condition = Condition::all().add(entity::info::Column::BucketId.eq(bucket_id));
-        FileEntity::find().filter(condition).paginate(&self.conn, 10).fetch_page(page_number).await
+    pub async fn read_page(&self, id: String, page_number: usize, page_size: usize) -> Result<Vec<FileModel>, DbErr> {
+        let condition = Condition::all().add(entity::info::Column::BucketId.eq(id));
+        FileEntity::find().filter(condition).paginate(&self.conn, page_size).fetch_page(page_number).await
 
     } 
 }

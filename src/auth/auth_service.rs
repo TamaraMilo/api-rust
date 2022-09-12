@@ -1,7 +1,6 @@
 use crate::auth::dto::UserIdetificationDTO;
 use crate::{
     context::AppState,
-    errors::Errors,
     user::{
         dto::UserCreateDTO,
         user_repository::{create_user, user_exist},
@@ -12,10 +11,11 @@ use entity::user::Role;
 use pwhash::bcrypt;
 use validator::Validate;
 
+use super::auth_errors::AuthError;
 use super::claims::Claims;
 use super::dto::{LoginRequest, UserData};
 
-pub fn user_verify(id: String, user_claims: Claims) -> bool {
+pub fn user_authentication(id: String, user_claims: Claims) -> bool {
     if id != user_claims.user_id {
         if user_claims.role != Role::Admin {
             return false;
@@ -27,7 +27,7 @@ pub fn user_verify(id: String, user_claims: Claims) -> bool {
 pub async fn singin_user(
     data: web::Data<AppState>,
     user: web::Json<LoginRequest>,
-) -> Result<UserData, Errors> {
+) -> Result<UserData, AuthError> {
     let user_db = user_exist(
         &data.conn,
         UserIdetificationDTO {
@@ -36,14 +36,14 @@ pub async fn singin_user(
         },
     )
     .await
-    .map_err(|_| return Errors::DatabaseError)?;
+    .map_err(|_| return AuthError::SignInError)?;
 
     let user_db = match user_db {
         Some(user) => user,
-        None => return Err(Errors::NoUser),
+        None => return Err(AuthError::IncorrectUserPassword),
     };
     if !bcrypt::verify(user.password.to_string(), &user_db.password) {
-        return Err(Errors::IncorrectUserPassword);
+        return Err(AuthError::IncorrectUserPassword);
     };
     Ok(UserData {
         user_id: user_db.user_id,
@@ -55,9 +55,9 @@ pub async fn singin_user(
 pub async fn singup_user(
     data: web::Data<AppState>,
     user: web::Json<UserCreateDTO>,
-) -> Result<UserData, Errors> {
+) -> Result<UserData, AuthError> {
     user.validate()
-        .map_err(|_| return Errors::PassAndUsernameError)?;
+        .map_err(|_| return AuthError::PassAndUsernameError)?;
 
     let user_exist = user_exist(
         &data.conn,
@@ -67,13 +67,13 @@ pub async fn singup_user(
         },
     )
     .await
-    .map_err(|_| return Errors::DatabaseError)?;
+    .map_err(|_| return AuthError::SingUpError)?;
     if user_exist.is_some() {
-        return Err(Errors::PassAndUsernameError);
+        return Err(AuthError::PassAndUsernameError);
     }
     let new_user = create_user(&data.conn, user.0)
         .await
-        .map_err(|_| return Errors::DatabaseError)?;
+        .map_err(|_| return AuthError::SingUpError)?;
 
     Ok(new_user)
 }

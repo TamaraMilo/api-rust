@@ -1,88 +1,88 @@
 use super::dto::{ChangeFile, FileInfoDTO};
+use super::file_errors::FileError;
 use super::file_manager::{ChangeArgs, FileManager, UploadData};
-use super::file_repository::{self, FileInfo};
-use crate::auth::auth_service::user_verify;
+use super::file_repository::{ FileInfo};
+use crate::auth::auth_service::{ user_authentication};
 use crate::auth::claims::Claims;
-use crate::bucket;
 use crate::bucket::bucket_repository::Bucket;
 use crate::repository::Reposiory;
-use crate::{context::AppState, errors::Errors};
+use crate::{context::AppState};
 use actix_easy_multipart::extractor::MultipartForm;
-use actix_web::{web, App};
+use actix_web::{web};
 use entity::info::Model as FileModel;
-use futures_util::TryFutureExt;
 
-pub async fn getFile(
+
+pub async fn read_file(
     data: web::Data<AppState>,
     id: web::Path<String>,
     user_claims: Claims,
-) -> Result<FileModel, Errors> {
+) -> Result<FileModel, FileError> {
     let file = FileInfo::new(data.conn.clone());
-    let fileModule = file
+    let file_module = file
         .read(id.to_string())
         .await
-        .map_err(|_| return Errors::DatabaseError)?;
-    if !user_verify(fileModule.user_id.to_string(), user_claims) {
-        return Err(Errors::Unauthorized);
+        .map_err(|_| return FileError::ReadingFileError)?;
+    if !user_authentication(file_module.user_id.to_string(), user_claims) {
+        return Err(FileError::Unauthorized);
     }
-    Ok(fileModule)
+    Ok(file_module)
 }
 
-pub async fn createFile(
+pub async fn save_file(
     data: web::Data<AppState>,
     mut payload: MultipartForm<UploadData>,
     user_claims: Claims,
-) -> Result<FileModel, Errors> {
+) -> Result<FileModel, FileError> {
     let bucket = Bucket::new(data.conn.clone());
-    let bucketModel = bucket
+    let bucket_model = bucket
         .read(payload.bucket.to_string())
         .await
-        .map_err(|_| return Errors::BucketNotExisting)?;
-    if !user_verify(bucketModel.user_id, user_claims.clone()) {
-        return Err(Errors::Unauthorized);
+        .map_err(|_| return FileError::CreateFileError)?;
+    if !user_authentication(bucket_model.user_id, user_claims.clone()) {
+        return Err(FileError::Unauthorized);
     }
-    let infoFileManager = FileManager::new(
+    let info_file_manager = FileManager::new(
         &mut payload.image,
-        bucketModel.bucket_id,
+        bucket_model.name,
         &data.env_data.basic_storage,
     )
-    .map_err(|_| return Errors::BucketNotExisting)?;
+    .map_err(|_| return FileError::NoBucketError)?;
 
     let file = FileInfo::new(data.conn.clone());
-    let fileModel = file
+    let file_model = file
         .create(FileInfoDTO {
-            id: infoFileManager.id.to_string(),
-            extension: infoFileManager.extension.to_string(),
-            path: infoFileManager.path.to_string(),
+            id: info_file_manager.id.to_string(),
+            extension: info_file_manager.extension.to_string(),
+            path: info_file_manager.path.to_string(),
             user_id: user_claims.user_id.to_string(),
             bucket_id: payload.bucket.to_string(),
         })
         .await
-        .map_err(|_| return Errors::DatabaseError)?;
+        .map_err(|_| return FileError::CreateFileError)?;
 
-    Ok(fileModel)
+    Ok(file_model)
 }
 
-pub async fn changeFile(
+pub async fn update_file(
     data: web::Data<AppState>,
     id: web::Path<String>,
     mut payload: MultipartForm<ChangeFile>,
     user_claims: Claims,
-) -> Result<FileModel, Errors> {
+) -> Result<FileModel, FileError> {
     let file = FileInfo::new(data.conn.clone());
-    let fileModel = file
+    let file_model = file
         .read(id.to_string())
         .await
-        .map_err(|_| return Errors::NoFileError)?;
-    if !user_verify(fileModel.id.to_string(), user_claims.clone()) {
-        return Err(Errors::Unauthorized);
+        .map_err(|_| return FileError::NoFileError)?;
+    if !user_authentication(file_model.id.to_string(), user_claims.clone()) {
+        return Err(FileError::Unauthorized);
     }
 
     let new_file_info = FileManager::change_data(ChangeArgs {
         data: &mut payload.image,
-        file_info: &fileModel,
+        file_info: &file_model,
     })
-    .map_err(|_| return Errors::ChangeFileError)?;
+    .map_err(|_| return FileError::ChangeFileError)?;
 
     let new_file = file
         .update(FileInfoDTO {
@@ -90,64 +90,54 @@ pub async fn changeFile(
             extension: new_file_info.extension,
             path: new_file_info.path,
             user_id: user_claims.user_id.to_string(),
-            bucket_id: fileModel.bucket_id.to_string(),
+            bucket_id: file_model.bucket_id.to_string(),
         })
         .await
-        .map_err(|_| return Errors::ChangeFileError)?;
+        .map_err(|_| return FileError::ChangeFileError)?;
     Ok(new_file)
 }
 
-pub async fn deleteFile(
+pub async fn remove_file(
     data: web::Data<AppState>,
     id: web::Path<String>,
     user_claims: Claims,
-) -> Result<(), Errors> {
+) -> Result<(), FileError> {
     let file = FileInfo::new(data.conn.clone());
-    let fileModel = file
+    let file_model = file
         .read(id.to_string())
         .await
-        .map_err(|_| return Errors::NoFileError)?;
-    if !user_verify(fileModel.id.to_string(), user_claims) {
-        return Err(Errors::Unauthorized);
+        .map_err(|_| return FileError::NoFileError)?;
+    if !user_authentication(file_model.id.to_string(), user_claims) {
+        return Err(FileError::Unauthorized);
     }
 
-    FileManager::delete(fileModel.path).map_err(|_| return Errors::DeletingFileError)?;
+    FileManager::delete(file_model.path).map_err(|_| return FileError::DeletingFileError)?;
     file.delete(id.to_string())
         .await
-        .map_err(|_| return Errors::DeletingFileError)?;
+        .map_err(|_| return FileError::DeletingFileError)?;
 
     Ok(())
 }
 
-pub async fn read_files_from_bucket(
-    data: web::Data<AppState>,
-    bucket_id: web::Path<String>,
-) -> Result<Vec<FileModel>, Errors> {
-    let file_reposetory = FileInfo::new(data.conn.clone());
-    Ok(file_reposetory
-        .read_files_from_bucket(bucket_id.to_string())
-        .await
-        .map_err(|_| return Errors::NoFileError)?)
-}
 pub async fn read_files_from_bucket_in_page(
     data: web::Data<AppState>,
-    bucket_id: web::Path<String>,
+    name: web::Path<String>,
     page_number: web::Path<usize>,
     user_claims: Claims,
-) -> Result<Vec<FileModel>, Errors> {
+) -> Result<Vec<FileModel>, FileError> {
     let bucket_repository = Bucket::new(data.conn.clone());
     let bucket = bucket_repository
-        .read(bucket_id.to_string())
+        .read(name.to_string())
         .await
-        .map_err(|_| return Errors::NoBucketError)?;
+        .map_err(|_| return FileError::NoBucketError)?;
 
-    if !user_verify(bucket.user_id, user_claims) {
-        return Err(Errors::Unauthorized);
+    if !user_authentication(bucket.user_id, user_claims) {
+        return Err(FileError::Unauthorized);
     }
 
     let file_repository = FileInfo::new(data.conn.clone());
     file_repository
-        .read_page(bucket_id.to_string(), page_number.to_be())
+        .read_page(bucket.bucket_id.to_string(), page_number.to_be(), data.env_data.page_size)
         .await
-        .map_err(|_| return Errors::DatabaseError)
+        .map_err(|_| return FileError::ReadingFileError)
 }

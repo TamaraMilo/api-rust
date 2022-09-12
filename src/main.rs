@@ -1,7 +1,5 @@
-use crate::auth::auth_controller::{singin, singout, singup};
-use crate::auth::dto::UserClaims;
+use crate::auth::auth_controller::{singin, singup};
 use crate::auth::jwt_service::validator;
-use actix_jwt_auth_middleware::{AuthService, Authority};
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use actix_web_httpauth::middleware::HttpAuthentication;
@@ -33,8 +31,6 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Error in conenction");
 
-    
-
     Migrator::up(&conn, None)
         .await
         .expect("Error performing migrations");
@@ -42,32 +38,35 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let auth = HttpAuthentication::bearer(validator);
         App::new()
-        .app_data(web::Data::new(AppState {
-                    conn: conn.clone(),
-                    env_data: env_data.clone(),
-                }))
-        .wrap(Logger::default())
+            .app_data(web::Data::new(AppState {
+                conn: conn.clone(),
+                env_data: env_data.clone(),
+            }))
+            .wrap(Logger::default())
             .service(
                 web::scope("/auth")
                     .service(singup)
-                    .service(singout)
                     .service(singin),
             )
             .service(
-                web::scope("/api")
+                web::scope("")
                     .wrap(auth)
-                    .service(change_file)
-                    .service(delete_file)
-                    .service(get_file)
-                    .service(create_file)
-                    .service(new_bucket)
-                    .service(delete_bucket)
-                    .service(get_files_page)
-                    .service(user_admin),
+                    .service(
+                        web::scope("file")
+                            .service(change_file)
+                            .service(delete_file)
+                            .service(get_file)
+                            .service(create_file)
+                            .service(get_files_page),
+                    )
+                    .service(
+                        web::scope("bucket")
+                            .service(new_bucket)
+                            .service(delete_bucket),
+                    )
+                    .service(web::scope("user").service(user_admin)),
             )
-            
     })
-
     .bind(("127.0.0.1", 8080))?
     .run()
     .await

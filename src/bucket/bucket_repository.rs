@@ -1,8 +1,7 @@
 use entity::bucket::Model;
-use migration::{DbErr, FrameClause, Condition};
+use migration::{DbErr, Condition};
 use sea_orm::{DatabaseConnection, EntityTrait, IntoActiveModel, ActiveModelTrait, DeleteResult, ColumnTrait, QueryFilter};
 use entity::bucket::Entity as BucketEntity;
-use uuid::Uuid;
 use crate::repository::Reposiory;
 use async_trait::async_trait;
 
@@ -28,15 +27,17 @@ impl Reposiory<Model,BucketDTO> for Bucket
     }
 
 
-    async fn read(&self,id:String) -> Result<Model,DbErr>{
-        let bucket = BucketEntity::find_by_id(id).one(&self.conn).await?;
+    async fn read(&self,name:String) -> Result<Model,DbErr>{
+        let condition = Condition::any().add(entity::bucket::Column::Name.eq(name));
+
+        let bucket = BucketEntity::find().filter(condition).one(&self.conn).await?;
         match bucket {
             Some(r)=> Ok(r),
             None => Err(DbErr::Custom("Nobucket".to_string()))
         }
     }
 
-    async fn update(&self, dto: BucketDTO) -> Result<Model,DbErr> {
+    async fn update(&self, _dto: BucketDTO) -> Result<Model,DbErr> {
         todo!()
     }
 
@@ -56,7 +57,7 @@ impl Bucket {
         let condition = Condition::any()
             .add(entity::bucket::Column::Name.eq(naziv));
         
-            BucketEntity::find().filter(condition).one(&self.conn).await.map_err(|_| return DbErr::RecordNotFound("No bucket".to_string()))
+        BucketEntity::find().filter(condition).one(&self.conn).await.map_err(|_| return DbErr::RecordNotFound("No bucket".to_string()))
     }
 
 }

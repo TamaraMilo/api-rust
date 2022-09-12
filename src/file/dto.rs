@@ -1,4 +1,3 @@
-use std::path::StripPrefixError;
 
 use actix_easy_multipart::{File as OtherFile, FromMultipart};
 

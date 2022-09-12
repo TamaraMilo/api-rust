@@ -1,5 +1,5 @@
-use super::claims::Claims;
-use crate::{context::AppState, errors::Errors};
+use super::{claims::Claims, auth_errors::AuthError};
+use crate::{context::AppState};
 use actix_web::{dev::ServiceRequest, error::ErrorUnauthorized, web, Error};
 use actix_web_grants::permissions::AttachPermissions;
 use actix_web_httpauth::extractors::bearer::BearerAuth;
@@ -12,7 +12,7 @@ pub fn create_jwt(claims: Claims, data: web::Data<AppState>) -> Result<String, E
 }
 
 pub fn decode_jwt(token: &str) -> Result<Claims, Error> {
-    let key = dotenv::var("SECRET").map_err(|_| return Errors::InternalError)?;
+    let key = dotenv::var("SECRET").map_err(|_| return AuthError::SignInError)?;
     let decoding_key = DecodingKey::from_secret(key.as_bytes());
     jsonwebtoken::decode(token, &decoding_key, &Validation::default())
         .map(|data| data.claims)
