@@ -11,7 +11,7 @@ pub struct Model {
     pub extension: String,
     pub path: String,
     pub user_id: String,
-    pub bucket_id: String,
+    pub bucket_id: String
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -1,16 +1,17 @@
 use super::dto::{ChangeFile, FileInfoDTO};
 use super::file_errors::FileError;
 use super::file_manager::{ChangeArgs, FileManager, UploadData};
-use super::file_repository::{ FileInfo};
-use crate::auth::auth_service::{ user_authentication};
+use super::file_repository::FileInfo;
+use crate::auth::auth_service::user_authentication;
 use crate::auth::claims::Claims;
 use crate::bucket::bucket_repository::Bucket;
+use crate::context::AppState;
 use crate::repository::Reposiory;
-use crate::{context::AppState};
 use actix_easy_multipart::extractor::MultipartForm;
-use actix_web::{web};
+use actix_web::{web, HttpResponse};
 use entity::info::Model as FileModel;
-
+use futures_util::TryFutureExt;
+use mime_guess::MimeGuess;
 
 pub async fn read_file(
     data: web::Data<AppState>,
@@ -25,6 +26,11 @@ pub async fn read_file(
     if !user_authentication(file_module.user_id.to_string(), user_claims) {
         return Err(FileError::Unauthorized);
     }
+
+    let mime = MimeGuess::from_path("adjdmoiwfmemiofmw.jpg")
+        .first_raw()
+        .unwrap();
+    println!("{:?}", mime);
     Ok(file_module)
 }
 
@@ -137,7 +143,29 @@ pub async fn read_files_from_bucket_in_page(
 
     let file_repository = FileInfo::new(data.conn.clone());
     file_repository
-        .read_page(bucket.bucket_id.to_string(), page_number.to_be(), data.env_data.page_size)
+        .read_page(
+            bucket.bucket_id.to_string(),
+            page_number.to_be(),
+            data.env_data.page_size,
+        )
         .await
         .map_err(|_| return FileError::ReadingFileError)
+}
+
+pub fn read_file_url(
+    data: web::Data<AppState>,
+    bucket: String,
+    file: String,
+) -> Result<HttpResponse, FileError> {
+    let buffer = FileManager::show_file(
+        data.env_data.basic_storage.to_string(),
+        bucket.to_string(),
+        file.to_string(),
+    )
+    .map_err(|_| return FileError::ReadingFileError)?;
+    let content_type = MimeGuess::from_path(file.to_string())
+        .first_raw()
+        .unwrap();
+
+    Ok(HttpResponse::Ok().content_type(content_type).body(buffer))
 }

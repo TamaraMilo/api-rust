@@ -83,4 +83,16 @@ impl FileManager {
             buf,
         })
     }
+
+    pub fn show_file(storage: String, bucket: String, file:String) -> Result<Vec<u8>, std::io::Error> 
+    {
+
+        let path = format!("{}{}/{}", storage, bucket, file);
+        let mut file = File::open(path)?;
+        let mut buffer = Vec::new();
+
+        file.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
+    }
 }

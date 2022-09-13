@@ -6,7 +6,7 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use bucket::bucket_controller::{delete_bucket, new_bucket};
 use context::{AppState, EnvData};
 use dotenv::dotenv;
-use file::file_controller::{change_file, create_file, delete_file, get_file, get_files_page};
+use file::file_controller::{change_file, create_file, delete_file, get_file, get_files_page, show_file_url};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::DatabaseConnection;
 use user::user_controller::user_admin;
@@ -44,6 +44,7 @@ async fn main() -> std::io::Result<()> {
                 env_data: env_data.clone(),
             }))
             .wrap(Logger::default())
+            .service(show_file_url)
             .service(
                 web::scope("/auth")
                     .service(singup)
@@ -51,6 +52,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope("")
+                    
                     .wrap(auth)
                     .service(
                         web::scope("file")

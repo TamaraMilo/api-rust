@@ -18,7 +18,7 @@ pub enum FileError {
     CreateFileError,
     #[display(fmt = "Bucket doesn't exist.")]
     NoBucketError,
-    #[display(fmt = "Reading bucket error.")]
+    #[display(fmt = "Reading file error.")]
     ReadingFileError,
 }
 impl error::ResponseError for FileError

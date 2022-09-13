@@ -9,7 +9,7 @@ use crate::{
     context::AppState,
     file::{
         file_manager::UploadData,
-        file_service::{update_file, save_file, remove_file, read_file, read_files_from_bucket_in_page}, dto::ChangeFile, file_errors::FileError,
+        file_service::{update_file, save_file, remove_file, read_file, read_files_from_bucket_in_page, read_file_url}, dto::ChangeFile, file_errors::FileError,
     },
 };
 
@@ -78,3 +78,9 @@ async fn delete_file(
 
     Ok(HttpResponse::Ok().finish())
 }
+#[get("/{bucket_name}/{file}")]
+async fn show_file_url(data: web::Data<AppState>, bucket_name: web::Path<(String,String)>) -> Result<HttpResponse,FileError>
+{
+    read_file_url(data,bucket_name.0.to_string(),bucket_name.1.to_string())
+}
+
